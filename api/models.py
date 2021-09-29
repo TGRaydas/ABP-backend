@@ -1,10 +1,47 @@
+import hashlib
 from django.db import models
 
 # Create your models here.
 from django.db import models
 from django.contrib.postgres.fields import JSONField
-
+from django.db.models.deletion import CASCADE
+import datetime
 from api.utils import format_date
+
+def hash(string):
+    return hashlib.sha256(string.encode()).hexdigest()
+
+class User(models.Model):
+    email = models.CharField(max_length=255,  primary_key=True)
+    password = models.CharField(max_length=512)
+    role = models.CharField(max_length=255, default='student')
+    def create(self):
+        user = User(email=self.email, password=hash(self.password), role=self.role)
+        user.save()
+
+class Session(models.Model):
+    token = models.CharField(max_length=70, blank=False, default='')
+    user = models.ForeignKey(User, on_delete=CASCADE)
+    active = models.BooleanField(default=True)
+    def create(self, user):
+        Session.objects.filter(user=user).update(active=False)
+        token = hash(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S') + user.email)
+        session = Session(token=token, user=user)
+        session.save()
+        return token
+    def login(self, username, password):
+        user = User.objects.filter(email=username).first()
+        if user is None:
+            return 'Usuario no encontrado', 'danger', None, None
+        if hash(password) == user.password:
+            session = Session().create(user)
+            return 'Sesion inicida', 'success', user.role, session
+        else:
+            return 'Clave incorrecta', 'danger', None, None
+    def get_user(self, token):
+        user = Session.objects.filter(token=token).first()
+        return user.user
+
 
 # Create your models here.
 class Project(models.Model):
@@ -50,7 +87,7 @@ class Product(models.Model):
         files = Files.objects.filter(project=self.project)
         project = {'id': self.project.identifier, 'name': self.project.name, 'end_date': format_date(self.project.end_date), 'start_date': format_date(self.project.start_date), 'files': list(map(lambda x : {'file': x.file_attach.url, 'file_name': x.file_name}, files))}
         files = Files.objects.filter(product=self)
-        product = {'name': self.name, 'end_date': format_date(self.end_date), 'description': self.description,  'start_date': format_date(self.start_date), 'files': map(lambda x : {'file': x.file_attach.url}, files)}
+        product = {'name': self.name, 'end_date': format_date(self.end_date), 'description': self.description,  'start_date': format_date(self.start_date), 'files': list(map(lambda x : {'file': x.file_attach.url}, files))}
         return  {'project': project, 'product': product}
 
 
@@ -117,3 +154,22 @@ class Node(models.Model):
             node = Node(product_step=product_step, project=Project.objects.get(identifier=data['project_id']), preview=preview)
             node.save()
             return node
+
+
+class AssignmentDelivery(models.Model):
+    identifier = models.AutoField(blank=False, primary_key=True)
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, null=True)
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, null=True)
+    product_step = models.ForeignKey(ProductStep, on_delete=models.CASCADE, null=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True)
+    file_name = models.CharField(max_length=80, blank=False, default='')
+    file_attach = models.FileField(upload_to='uploads/')
+    delivery_date = models.DateTimeField(default=datetime.datetime.now())
+#    def create(self, data):
+#        project = Project(identifier=data['project_id'])
+##        name = data['name']
+#        product = Product(identifier=data['product_id'])
+#        product_step = ProductStep(identifier=data['product_step_id'])
+#        file_ = Files(name=name, project=project, product=product, product_step=product_step)
+#        file_.save()
+#        return True
