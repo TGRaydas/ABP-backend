@@ -87,8 +87,9 @@ class ProjectView(View):
     def post(self, request):
         body_unicode = request.body.decode('utf-8')
         body = json.loads(body_unicode)
-        project = Project()
-        project.create(body)
+        utils.create_project(body['projectName'],
+                             body['productName'], int(body['steps']))
+
         content = {'message': 'Proyecto creado', 'error': False}
         return JsonResponse(content)
 
@@ -121,6 +122,19 @@ class ProductView(View):
         product = product.create(body, "product", node)
         content = {'message': 'Producto creado',
                    'error': False, 'node': product.identifier}
+        return JsonResponse(content)
+
+    def put(self, request):
+        body_unicode = request.body.decode('utf-8')
+        body = json.loads(body_unicode)['data']
+        product = Product.objects.get(identifier=body['identifier'])
+        product.name = body['name']
+        product.start_date = body['startDate']
+        product.end_date = body['endDate']
+        product.description = body['description']
+        product.save()
+        content = {'message': 'Producto actualizado',
+                   'error': False}
         return JsonResponse(content)
 
 
@@ -164,6 +178,19 @@ class ProductStepView(View):
                    'error': False, 'node': product.identifier}
         return JsonResponse(content)
 
+    def put(self, request):
+        body_unicode = request.body.decode('utf-8')
+        body = json.loads(body_unicode)['data']
+        step = ProductStep.objects.get(identifier=body['identifier'])
+        step.name = body['name']
+        step.start_date = body['startDate']
+        step.end_date = body['endDate']
+        step.description = body['description']
+        step.save()
+        content = {'message': 'Etapa actualizada',
+                   'error': False}
+        return JsonResponse(content)
+
 
 @api_view(['GET', 'PUT'])
 def FilesView(request):
@@ -192,7 +219,8 @@ def FilesView(request):
             new_file = Files(file_attach=file_, product=Product.objects.get(
                 identifier=identifier), file_name=file_name)
             new_file.save()
-        content = {'message': 'Etapa creada', 'error': False}
+        content = {'message': 'Archivo agregado a las ' + datetime.datetime.now().strftime(
+            '%Y-%m-%d %H:%M:%S'), 'error': False}
         return JsonResponse(content)
 
 
