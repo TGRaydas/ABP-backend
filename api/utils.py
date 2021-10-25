@@ -123,3 +123,55 @@ def create_project(project_name, product_name, steps):
         last = node
     node = Node(product=product, initial=False, preview=last, project=project)
     node.save()
+
+
+def get_groups_by_project(project):
+    from api.models import Group
+    from api.models import UserGroup
+    from api.models import UserProfile
+    groups = Group.objects.filter(project=project)
+    return_groups = []
+    for group in groups:
+        user_groups = UserGroup.objects.filter(group=group)
+        users = []
+        for user_group in user_groups:
+            users.append(UserProfile.objects.filter(
+                user=user_group.user).first().get_user_data())
+        return_groups.append(
+            {'name': group.name, 'identifier': group.identifier, 'users': users})
+    return return_groups
+
+
+def get_assigment_delivery_by_project_group(context, user, context_type, identifier):
+    from api.models import Group
+    from api.models import UserGroup
+    from api.models import AssignmentDelivery
+    from api.models import ProductStep
+    from api.models import Product
+    delivery = None
+    if context_type == "product":
+        project = context.project
+        groups = Group.objects.filter(project=project)
+        users_groups = UserGroup.objects.filter(user=user)
+        for group in groups:
+            if users_groups.filter(group=group).count() > 0:
+                for user_group in users_groups.filter(group=group):
+                    context_user = user_group.user
+                    delivery = AssignmentDelivery.objects.filter(
+                        product=Product.objects.get(identifier=identifier), user=context_user).first()
+                    break
+                break
+    elif context_type == "step":
+        project = context.project
+        groups = Group.objects.filter(project=project)
+        users_groups = UserGroup.objects.filter(user=user)
+        for group in groups:
+            if users_groups.filter(group=group).count() > 0:
+                for user_group in UserGroup.objects.filter(group=group):
+                    print(user_group.user)
+                    context_user = user_group.user
+                    delivery = AssignmentDelivery.objects.filter(
+                        product_step=ProductStep.objects.get(identifier=identifier), user=context_user).first()
+                    break
+                break
+    return delivery

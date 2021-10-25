@@ -29,21 +29,77 @@ class UserView(View):
     authentication_classes = ()
 
     def get(self, request):
-        identifier = request.GET.get('identifier')
-        if identifier == None:
-            content = utils.the_matrix()
-            content = {'message': 'success', 'data': content}
-            return JsonResponse(content)
-        content = Project.objects.get(identifier=identifier).serialize()
+        role = request.GET.get('role')
+        users = UserProfile().get_all_by_role(role)
+        content = {'message': 'users', 'error': False, 'data': users}
         return JsonResponse(content)
 
     def post(self, request):
         body_unicode = request.body.decode('utf-8')
         body = json.loads(body_unicode)
-        user = User(email=body['username'],
+        user = User(email=body['email'],
                     password=body['password'], role=body['role'])
         user.create()
-        content = {'message': 'user created', 'error': False}
+        user_profile = UserProfile(
+            user=user, rut=body['rut'], name=body['name'], last_name=body['last_name'])
+        user_profile.save()
+        content = {'message': 'user created' + body['email'], 'error': False}
+        return JsonResponse(content)
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class GroupView(View):
+    permission_classes = ()
+    authentication_classes = ()
+
+    def get(self, request):
+        project = Project.objects.get(identifier=request.GET.get('identifier'))
+        return_groups = utils.get_groups_by_project(project)
+        content = {'message': 'user created',
+                   'data': return_groups, 'error': False}
+        return JsonResponse(content)
+
+    def post(self, request):
+        body_unicode = request.body.decode('utf-8')
+        body = json.loads(body_unicode)
+        project = Project.objects.get(identifier=body['identifier'])
+        group = Group(project=project, name=body['name'])
+        group.save()
+        content = {'message': 'group created' + body['name'], 'error': False}
+        return JsonResponse(content)
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class UserGroupView(View):
+    permission_classes = ()
+    authentication_classes = ()
+
+    def get(self, request):
+        action = request.GET.get('action')
+        if action == 'free':
+            project_id = request.GET.get('project_id')
+            project = Project.objects.filter(identifier=project_id).first()
+            user_data = UserGroup().get_users_not_in_groups_by_project(project)
+            content = {'message': 'success', 'data': user_data}
+            return JsonResponse(content)
+        else:
+            identifier = request.GET.get('identifier')
+            if identifier == None:
+                content = utils.the_matrix()
+                content = {'message': 'success', 'data': content}
+                return JsonResponse(content)
+            content = Project.objects.get(identifier=identifier).serialize()
+            return JsonResponse(content)
+
+    def post(self, request):
+        body_unicode = request.body.decode('utf-8')
+        body = json.loads(body_unicode)
+        user = User.objects.get(email=body['email'])
+        group = Group.objects.get(identifier=body['identifier'])
+        user_group = UserGroup(user=user, group=group)
+        user_group.save()
+        content = {'message': 'user group created ' +
+                   str(user_group.identifier), 'error': False}
         return JsonResponse(content)
 
 
@@ -233,16 +289,14 @@ def AssignmentDeliveryView(request):
             user = Session().get_user(
                 request.headers['Authorization'].split(' ')[1])
             delivery = None
-            if type_ == 'project':
-                delivery = AssignmentDelivery.objects.filter(
-                    project=Project.objects.get(identifier=identifier), user=user).first()
-            elif type_ == 'step':
-                delivery = AssignmentDelivery.objects.filter(
-                    product_step=ProductStep.objects.get(identifier=identifier), user=user).first()
+            if type_ == 'step':
+                context = ProductStep.objects.get(identifier=identifier)
+                delivery = utils.get_assigment_delivery_by_project_group(
+                    context, user, type_, identifier)
             elif type_ == 'product':
-                delivery = AssignmentDelivery.objects.filter(
-                    product=Product.objects.get(identifier=identifier), user=user).first()
-
+                context = Product.objects.get(identifier=identifier)
+                delivery = utils.get_assigment_delivery_by_project_group(
+                    context, user, type_, identifier)
             content = {'message': delivery != None, 'error': False}
             if delivery != None:
                 content = {'message': delivery != None, 'error': False,
