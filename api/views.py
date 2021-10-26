@@ -137,8 +137,11 @@ class ProjectView(View):
             content = utils.the_matrix()
             content = {'message': 'success', 'data': content}
             return JsonResponse(content)
-        content = Project.objects.get(identifier=identifier).serialize()
-        return JsonResponse(content)
+        else:
+            content = utils.get_project_tree(
+                Project.objects.get(identifier=identifier))
+            content = {'message': 'success', 'data': content}
+            return JsonResponse(content)
 
     def post(self, request):
         body_unicode = request.body.decode('utf-8')
@@ -147,6 +150,18 @@ class ProjectView(View):
                              body['productName'], int(body['steps']))
 
         content = {'message': 'Proyecto creado', 'error': False}
+        return JsonResponse(content)
+
+    def put(self, request):
+        body_unicode = request.body.decode('utf-8')
+        body = json.loads(body_unicode)
+        node_id = body['node_id']
+        product_name = body['product_name']
+        steps = int(body['steps'])
+        project = Project.objects.get(identifier=body['project_id'])
+        utils.add_nodes_project(steps, product_name, project, node_id)
+        content = {'data': 'Editado el flujo del proyecto a las ' +
+                   str(datetime.datetime.now()), 'error': False}
         return JsonResponse(content)
 
 
@@ -201,6 +216,30 @@ class ProjectGraph(View):
 
     def get(self, request):
         content = utils.get_graph(1)
+        return JsonResponse(content)
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class Deliveries(View):
+    permission_classes = ()
+    authentication_classes = ()
+
+    def get(self, request):
+        type_ = request.GET.get('type_')
+        identifier = request.GET.get('identifier')
+        project_id = request.GET.get('project_id')
+        project = Project.objects.get(identifier=project_id)
+        groups_results = []
+        if type_ == 'step':
+            context = ProductStep.objects.get(identifier=identifier)
+            groups_results = utils.get_groups_delivery_assigment(
+                project, context, type_)
+        elif type_ == 'product':
+            context = Product.objects.get(identifier=identifier)
+            groups_results = utils.get_groups_delivery_assigment(
+                project, context, type_)
+        content = {'message': 'Group Result',
+                   'error': False, 'data': groups_results}
         return JsonResponse(content)
 
 

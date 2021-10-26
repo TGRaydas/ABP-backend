@@ -53,10 +53,10 @@ def get_node_dict(node):
     from api.models import ProductStep
     if node.product is not None:
         product = node.product
-        return {'node_id': node.identifier, 'id': product.identifier, 'name': product.name, 'children': [], 'type': 'product', 'start_date': format_date(product.start_date), 'end_date': format_date(product.end_date)}
+        return {'project_id': product.project.identifier, 'node_id': node.identifier, 'id': product.identifier, 'name': product.name, 'children': [], 'type': 'product', 'start_date': format_date(product.start_date), 'end_date': format_date(product.end_date)}
     elif node.product_step is not None:
         product = node.product_step
-        return {'node_id': node.identifier, 'id': product.identifier, 'name': product.name, 'children': [], 'type': 'step', 'start_date': format_date(product.start_date), 'end_date': format_date(product.end_date)}
+        return {'project_id': product.project.identifier, 'node_id': node.identifier, 'id': product.identifier, 'name': product.name, 'children': [], 'type': 'step', 'start_date': format_date(product.start_date), 'end_date': format_date(product.end_date)}
     else:
         return {'node_id': node.identifier, 'name': 'inicio'}
 
@@ -83,6 +83,15 @@ def get_project_tree(project_id):
     first_node = Node.objects.filter(project=project, preview=None).first()
     tree = node_search(first_node)
     return tree
+
+
+def get_project_tree(project):
+    from api.models import Node
+    first_node = Node.objects.filter(project=project, preview=None).first()
+    if first_node is None:
+        return {'project': project.serialize(), 'tree': {}}
+    tree = node_search(first_node)
+    return {'project': project.serialize(), 'tree': tree}
 
 
 def the_matrix():
@@ -119,6 +128,24 @@ def create_project(project_name, product_name, steps):
         step.save()
         node = Node(product_step=step, initial=True if i ==
                     0 else False, preview=None if i == 0 else last, project=project)
+        node.save()
+        last = node
+    node = Node(product=product, initial=False, preview=last, project=project)
+    node.save()
+
+
+def add_nodes_project(steps, product_name, project, node_id):
+    from api.models import Product
+    from api.models import ProductStep
+    from api.models import Node
+    product = Product(name=product_name, project=project)
+    product.save()
+    last = Node.objects.get(identifier=node_id)
+    for i in range(steps):
+        step = ProductStep(product=product, project=project)
+        step.save()
+        node = Node(product_step=step, initial=False,
+                    preview=last, project=project)
         node.save()
         last = node
     node = Node(product=product, initial=False, preview=last, project=project)
@@ -175,3 +202,45 @@ def get_assigment_delivery_by_project_group(context, user, context_type, identif
                     break
                 break
     return delivery
+
+
+def get_group_users(group):
+    from api.models import UserGroup
+    from api.models import UserProfile
+    user_groups = UserGroup.objects.filter(group=group)
+    users = []
+    for user_group in user_groups:
+        users.append(UserProfile.objects.filter(
+            user=user_group.user).first().get_user_data())
+    return {'name': group.name, 'identifier': group.identifier, 'users': users}
+
+
+def get_groups_delivery_assigment(project, context, context_type):
+    from api.models import Group
+    from api.models import UserGroup
+    from api.models import UserProfile
+    from api.models import AssignmentDelivery
+    from api.models import ProductStep
+    from api.models import Product
+    groups = Group.objects.filter(project=project)
+    return_groups = []
+    for group in groups:
+        user_groups = UserGroup.objects.filter(group=group)
+        delivery = None
+        for user_group in user_groups:
+            if context_type == "product":
+                delivery = AssignmentDelivery.objects.filter(
+                    product=context, user=user_group.user).first()
+                if delivery is not None:
+                    break
+            elif context_type == "step":
+                delivery = AssignmentDelivery.objects.filter(
+                    product_step=context, user=user_group.user).first()
+                if delivery is not None:
+                    break
+        group_data = get_group_users(group)
+        group_data['delivery'] = delivery
+        if delivery is not None:
+            group_data['delivery'] = delivery.assigment_data()
+        return_groups.append(group_data)
+    return return_groups
