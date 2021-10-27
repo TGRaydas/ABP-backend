@@ -204,8 +204,9 @@ class ProductView(View):
         product.end_date = body['endDate']
         product.description = body['description']
         product.save()
-        content = {'message': 'Producto actualizado',
-                   'error': False}
+        content = {'message': 'Producto actualizado at' + datetime.datetime.now().strftime(
+            '%Y-%m-%d %H:%M:%S'),
+            'error': False}
         return JsonResponse(content)
 
 
@@ -282,8 +283,9 @@ class ProductStepView(View):
         step.end_date = body['endDate']
         step.description = body['description']
         step.save()
-        content = {'message': 'Etapa actualizada',
-                   'error': False}
+        content = {'message': 'Etapa actualizada at' + datetime.datetime.now().strftime(
+            '%Y-%m-%d %H:%M:%S'),
+            'error': False}
         return JsonResponse(content)
 
 
