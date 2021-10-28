@@ -98,8 +98,8 @@ class UserGroupView(View):
         group = Group.objects.get(identifier=body['identifier'])
         user_group = UserGroup(user=user, group=group)
         user_group.save()
-        content = {'message': 'user group created ' +
-                   str(user_group.identifier), 'error': False}
+        content = {'message': 'user group created ' + datetime.datetime.now().strftime(
+            '%Y-%m-%d %H:%M:%S'), 'error': False}
         return JsonResponse(content)
 
 
