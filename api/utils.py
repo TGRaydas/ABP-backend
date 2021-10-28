@@ -172,36 +172,28 @@ def get_groups_by_project(project):
 def get_assigment_delivery_by_project_group(context, user, context_type, identifier):
     from api.models import Group
     from api.models import UserGroup
+    from api.models import UserProfile
     from api.models import AssignmentDelivery
     from api.models import ProductStep
     from api.models import Product
-    delivery = None
-    if context_type == "product":
-        project = context.project
-        groups = Group.objects.filter(project=project)
-        users_groups = UserGroup.objects.filter(user=user)
-        for group in groups:
-            if users_groups.filter(group=group).count() > 0:
-                for user_group in users_groups.filter(group=group):
-                    context_user = user_group.user
-                    delivery = AssignmentDelivery.objects.filter(
-                        product=Product.objects.get(identifier=identifier), user=context_user).first()
+    groups = UserGroup.objects.filter(user=user)
+    for group in groups:
+        if group.group.project != context.project:
+            continue
+        user_groups = UserGroup.objects.filter(group=group.group)
+        delivery = None
+        for user_group in user_groups:
+            if context_type == "product":
+                delivery = AssignmentDelivery.objects.filter(
+                    product=context, user=user_group.user).first()
+                if delivery is not None:
                     break
-                break
-    elif context_type == "step":
-        project = context.project
-        groups = Group.objects.filter(project=project)
-        users_groups = UserGroup.objects.filter(user=user)
-        for group in groups:
-            if users_groups.filter(group=group).count() > 0:
-                for user_group in UserGroup.objects.filter(group=group):
-                    print(user_group.user)
-                    context_user = user_group.user
-                    delivery = AssignmentDelivery.objects.filter(
-                        product_step=ProductStep.objects.get(identifier=identifier), user=context_user).first()
+            elif context_type == "step":
+                delivery = AssignmentDelivery.objects.filter(
+                    product_step=context, user=user_group.user).first()
+                if delivery is not None:
                     break
-                break
-    return delivery
+        return delivery
 
 
 def get_group_users(group):
