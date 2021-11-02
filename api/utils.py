@@ -236,3 +236,67 @@ def get_groups_delivery_assigment(project, context, context_type):
             group_data['delivery'] = delivery.assigment_data()
         return_groups.append(group_data)
     return return_groups
+
+
+def get_groups_delivery_assigment_fast(project, context, context_type):
+    from api.models import Group
+    from api.models import UserGroup
+    from api.models import UserProfile
+    from api.models import AssignmentDelivery
+    from api.models import ProductStep
+    from api.models import Product
+    groups = Group.objects.filter(project=project)
+    return_groups = []
+    for group in groups:
+        delivery = None
+        if context_type == "product":
+            delivery = AssignmentDelivery.objects.filter(
+                product=context, group=group).first()
+        elif context_type == "step":
+            delivery = AssignmentDelivery.objects.filter(
+                product_step=context, group=group).first()
+        group_data = {'name': group.name,
+                      'identifier': group.identifier, 'delivery': delivery}
+        if delivery is not None:
+            group_data['delivery'] = delivery.assigment_data()
+        return_groups.append(group_data)
+    return return_groups
+
+
+def resume_node_search(node, data, project):
+    from api.models import ProductStep
+    from api.models import Product
+    from api.models import Node
+    if node.product_step is not None:
+        d = {'name': node.product_step.name, 'type': 'step', 'data': get_groups_delivery_assigment_fast(
+            project, node.product_step, 'step')}
+        data.append(d)
+    elif node.product is not None:
+        d = {'name': node.product.name, 'type': 'product', 'data': get_groups_delivery_assigment_fast(
+            project, node.product, 'product')}
+        data.append(d)
+    next_nodes = Node.objects.filter(project=project, preview=node)
+    for next_node in next_nodes:
+        resume_node_search(next_node, data, project)
+
+
+def resume_groups_project(identifier):
+    from api.models import Project
+    from api.models import Group
+    from api.models import ProductStep
+    from api.models import Product
+    from api.models import Node
+    project = Project.objects.filter(identifier=identifier).first()
+    groups = Group.objects.filter(project=project)
+    first_node = Node.objects.filter(project=project, preview=None).first()
+    data = []
+    resume_node_search(first_node, data, project)
+    return data
+
+
+def get_group_by_user_project(project, user):
+    from api.models import Group
+    from api.models import UserGroup
+    for user_group in UserGroup.objects.filter(user=user):
+        if user_group.group.project == project:
+            return user_group.group

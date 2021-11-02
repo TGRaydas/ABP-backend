@@ -15,4 +15,5 @@ urlpatterns = [
     path('project/user/group/', UserGroupView.as_view(), name='usergroup'),
     path('files/', FilesView, name='files'),
     path('assigment-delivery/', AssignmentDeliveryView, name='files'),
+    path('resume/', Resume.as_view(), name='resume'),
 ]

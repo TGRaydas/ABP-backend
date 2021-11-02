@@ -245,6 +245,7 @@ class AssignmentDelivery(models.Model):
     file_name = models.CharField(max_length=80, blank=False, default='')
     file_attach = models.FileField(upload_to='uploads/')
     delivery_date = models.DateTimeField(default=datetime.datetime.now())
+    group = models.ForeignKey(Group, on_delete=models.CASCADE, null=True)
 
     def assigment_data(self):
         return {'id': self.identifier, 'url': self.file_attach.url, 'delivery_date': format_date(self.delivery_date), 'user': UserProfile.objects.get(user=self.user).get_user_data()}

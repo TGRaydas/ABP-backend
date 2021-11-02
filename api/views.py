@@ -221,6 +221,19 @@ class ProjectGraph(View):
 
 
 @method_decorator(csrf_exempt, name='dispatch')
+class Resume(View):
+    permission_classes = ()
+    authentication_classes = ()
+
+    def get(self, request):
+        identifier = request.GET.get('identifier')
+        resume = utils.resume_groups_project(identifier)
+        content = {'message': 'Resume',
+                   'error': False, 'data': resume}
+        return JsonResponse(content)
+
+
+@method_decorator(csrf_exempt, name='dispatch')
 class Deliveries(View):
     permission_classes = ()
     authentication_classes = ()
@@ -349,7 +362,7 @@ def AssignmentDeliveryView(request):
             file_name = request.GET.get('identifier')
             delivery = AssignmentDelivery.objects.get(
                 identifier=file_name).file_attach
-            #file_ = open(os.path.join(os.getcwd(), delivery.file_attach), 'rb')
+            # file_ = open(os.path.join(os.getcwd(), delivery.file_attach), 'rb')
             response = FileResponse(delivery)
             return response
 
@@ -373,22 +386,29 @@ def AssignmentDeliveryView(request):
                 exist.delivery_date = datetime.datetime.now()
                 exist.save()
         elif type_ == 'step':
+            project = ProductStep.objects.get(
+                identifier=identifier).project
+            group = utils.get_group_by_user_project(project, user)
+            print(group)
             exist = AssignmentDelivery.objects.filter(product_step=ProductStep.objects.get(
                 identifier=identifier), user=user).first()
             if exist == None:
                 new_file = AssignmentDelivery(file_attach=file_, product_step=ProductStep.objects.get(
-                    identifier=identifier), file_name=file_name, user=user)
+                    identifier=identifier), file_name=file_name, user=user, group=group)
                 new_file.save()
             else:
                 exist.file_attach = file_
                 exist.delivery_date = datetime.datetime.now()
                 exist.save()
         elif type_ == 'product':
+            project = Product.objects.get(
+                identifier=identifier).project
+            group = utils.get_group_by_user_project(project, user)
             exist = AssignmentDelivery.objects.filter(product=Product.objects.get(
                 identifier=identifier), user=user).first()
             if exist == None:
                 new_file = AssignmentDelivery(file_attach=file_, product=Product.objects.get(
-                    identifier=identifier), file_name=file_name, user=user)
+                    identifier=identifier), file_name=file_name, user=user, group=group)
                 new_file.save()
             else:
                 exist.file_attach = file_
