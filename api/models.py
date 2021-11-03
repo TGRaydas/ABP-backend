@@ -257,3 +257,12 @@ class AssignmentDelivery(models.Model):
 #        file_ = Files(name=name, project=project, product=product, product_step=product_step)
 #        file_.save()
 #        return True
+
+
+class Feedback(models.Model):
+    identifier = models.AutoField(blank=False, primary_key=True)
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, null=True)
+    product_step = models.ForeignKey(
+        ProductStep, on_delete=models.CASCADE, null=True)
+    group = models.ForeignKey(Group, on_delete=models.CASCADE, null=True)
+    feedback = models.CharField(max_length=1500, blank=False, default='')

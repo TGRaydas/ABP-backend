@@ -133,13 +133,17 @@ class ProjectView(View):
 
     def get(self, request):
         identifier = request.GET.get('identifier')
+        user = Session().get_user(
+            request.headers['Authorization'].split(' ')[1])
+        if user.role == "teacher":
+            user = None
         if identifier == None:
-            content = utils.the_matrix()
+            content = utils.the_matrix(user)
             content = {'message': 'success', 'data': content}
             return JsonResponse(content)
         else:
             content = utils.get_project_tree(
-                Project.objects.get(identifier=identifier))
+                Project.objects.get(identifier=identifier), user)
             content = {'message': 'success', 'data': content}
             return JsonResponse(content)
 
@@ -343,18 +347,28 @@ def AssignmentDeliveryView(request):
             user = Session().get_user(
                 request.headers['Authorization'].split(' ')[1])
             delivery = None
+            feedback = None
             if type_ == 'step':
                 context = ProductStep.objects.get(identifier=identifier)
+                group = utils.get_group_by_user_project(context.project, user)
+                feedback = Feedback.objects.filter(
+                    group=group, product_step=context).first()
                 delivery = utils.get_assigment_delivery_by_project_group(
                     context, user, type_, identifier)
+
             elif type_ == 'product':
                 context = Product.objects.get(identifier=identifier)
+                group = utils.get_group_by_user_project(context.project, user)
+                feedback = Feedback.objects.filter(
+                    group=group, product=context).first()
                 delivery = utils.get_assigment_delivery_by_project_group(
                     context, user, type_, identifier)
             content = {'message': delivery != None, 'error': False}
             if delivery != None:
+                if feedback is not None:
+                    feedback = feedback.feedback
                 content = {'message': delivery != None, 'error': False,
-                           "identifier": delivery.identifier, 'date':  delivery.delivery_date}
+                           "identifier": delivery.identifier, 'date':  delivery.delivery_date, 'feedback': feedback}
             return JsonResponse(content)
 
         else:
@@ -415,4 +429,53 @@ def AssignmentDeliveryView(request):
                 exist.delivery_date = datetime.datetime.now()
                 exist.save()
         content = {'message': 'Etapa creada', 'error': False}
+        return JsonResponse(content)
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class FeedbackView(View):
+    permission_classes = ()
+    authentication_classes = ()
+
+    def get(self, request):
+        context_type = request.GET.get('type')
+        group_id = request.GET.get('group_id')
+
+        product = Product.objects.get(identifier=request.GET.get('identifier'))
+        content = product.get_view()
+        print(content)
+        return JsonResponse(content)
+
+    def post(self, request):
+        body_unicode = request.body.decode('utf-8')
+        body = json.loads(body_unicode)
+
+        print(body)
+        if body['type'] == 'step':
+            step = ProductStep.objects.get(identifier=body['identifier'])
+            feedback = Feedback(group=Group.objects.get(
+                identifier=body['group_id']), feedback=body['text'], product_step=step)
+            feedback.save()
+        elif body['type'] == 'product':
+            product = Product.objects.get(identifier=body['identifier'])
+            feedback = Feedback(group=Group.objects.get(
+                identifier=body['group_id']), feedback=body['text'], product=product)
+            feedback.save()
+        content = {'message': 'Feedback creado',
+                   'error': False}
+        return JsonResponse(content)
+        return
+        if 'referenceType' not in body:
+            pass
+        elif body['referenceType'] == "step":
+            step = ProductStep.objects.get(identifier=body['reference_id'])
+            node = Node.objects.get(product_step=step)
+        elif body['referenceType'] == "product":
+            product_preview = Product.objects.get(
+                identifier=body['reference_id'])
+            node = Node.objects.get(product=product_preview)
+        product = Node()
+        product = product.create(body, "product", node)
+        content = {'message': 'Producto creado',
+                   'error': False, 'node': product.identifier}
         return JsonResponse(content)

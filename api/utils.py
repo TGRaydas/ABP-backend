@@ -47,72 +47,6 @@ def format_date(date):
     return None
 
 
-def get_node_dict(node):
-    from api.models import Project
-    from api.models import Product
-    from api.models import ProductStep
-    if node.product is not None:
-        product = node.product
-        return {'project_id': product.project.identifier, 'node_id': node.identifier, 'id': product.identifier, 'name': product.name, 'children': [], 'type': 'product', 'start_date': format_date(product.start_date), 'end_date': format_date(product.end_date)}
-    elif node.product_step is not None:
-        product = node.product_step
-        return {'project_id': product.project.identifier, 'node_id': node.identifier, 'id': product.identifier, 'name': product.name, 'children': [], 'type': 'step', 'start_date': format_date(product.start_date), 'end_date': format_date(product.end_date)}
-    else:
-        return {'node_id': node.identifier, 'name': 'inicio'}
-
-
-def node_search(first):
-    from api.models import Project
-    from api.models import Product
-    from api.models import ProductStep
-    from api.models import Node
-    next_nodes = Node.objects.filter(preview=first)
-    tree = get_node_dict(first)
-    for next_node in next_nodes:
-        if next_node is None:
-            continue
-        childs = node_search(next_node)
-        tree['children'].append(childs)
-    return tree
-
-
-def get_project_tree(project_id):
-    from api.models import Project
-    from api.models import Node
-    project = Project.objects.get(identifier=project_id)
-    first_node = Node.objects.filter(project=project, preview=None).first()
-    tree = node_search(first_node)
-    return tree
-
-
-def get_project_tree(project):
-    from api.models import Node
-    first_node = Node.objects.filter(project=project, preview=None).first()
-    if first_node is None:
-        return {'project': project.serialize(), 'tree': {}}
-    tree = node_search(first_node)
-    return {'project': project.serialize(), 'tree': tree}
-
-
-def the_matrix():
-    from api.models import Project
-    from api.models import Product
-    from api.models import ProductStep
-    from api.models import Node
-    return_projects_format = []
-    projects = Project.objects.all()
-    for project in projects:
-        first_node = Node.objects.filter(project=project, preview=None).first()
-        if first_node is None:
-            return_projects_format.append(
-                {'project': project.serialize(), 'tree': {}})
-            continue
-        tree = node_search(first_node)
-        return_projects_format.append(
-            {'project': project.serialize(), 'tree': tree})
-    return return_projects_format
-
-
 def create_project(project_name, product_name, steps):
     from api.models import Project
     from api.models import Product
@@ -269,11 +203,11 @@ def resume_node_search(node, data, project):
     from api.models import Node
     if node.product_step is not None:
         d = {'name': node.product_step.name, 'type': 'step', 'data': get_groups_delivery_assigment_fast(
-            project, node.product_step, 'step')}
+            project, node.product_step, 'step'), 'id': node.identifier}
         data.append(d)
     elif node.product is not None:
         d = {'name': node.product.name, 'type': 'product', 'data': get_groups_delivery_assigment_fast(
-            project, node.product, 'product')}
+            project, node.product, 'product'), 'id': node.identifier}
         data.append(d)
     next_nodes = Node.objects.filter(project=project, preview=node)
     for next_node in next_nodes:
@@ -300,3 +234,85 @@ def get_group_by_user_project(project, user):
     for user_group in UserGroup.objects.filter(user=user):
         if user_group.group.project == project:
             return user_group.group
+
+
+def get_node_dict(node, user=None):
+    from api.models import Project
+    from api.models import Product
+    from api.models import ProductStep
+    if node.product is not None:
+        product = node.product
+        d = {'project_id': product.project.identifier, 'node_id': node.identifier, 'id': product.identifier, 'name': product.name,
+             'children': [], 'type': 'product', 'start_date': format_date(product.start_date), 'end_date': format_date(product.end_date)}
+        if user is not None:
+            delivery = get_assigment_delivery_by_project_group(
+                product, user, 'product', product.project.identifier)
+            d['delivery'] = delivery != None
+        return d
+    elif node.product_step is not None:
+        product = node.product_step
+        d = {'project_id': product.project.identifier, 'node_id': node.identifier, 'id': product.identifier, 'name': product.name,
+             'children': [], 'type': 'step', 'start_date': format_date(product.start_date), 'end_date': format_date(product.end_date)}
+        if user is not None:
+            delivery = get_assigment_delivery_by_project_group(
+                product, user, 'step', product.project.identifier)
+            d['delivery'] = delivery != None
+        return d
+    else:
+        return {'node_id': node.identifier, 'name': 'inicio'}
+
+
+def node_search(first, user=None, prev_complish=False):
+    from api.models import Project
+    from api.models import Product
+    from api.models import ProductStep
+    from api.models import Node
+    next_nodes = Node.objects.filter(preview=first)
+    tree = get_node_dict(first, user)
+    tree_past_del = False
+    if 'delivery' in tree:
+        tree_past_del = tree['delivery']
+    for next_node in next_nodes:
+        if next_node is None:
+            continue
+        childs = node_search(next_node, user, tree_past_del)
+        tree['children'].append(childs)
+    tree['delivery_past'] = prev_complish
+    return tree
+
+
+def get_project_tree(project_id):
+    from api.models import Project
+    from api.models import Node
+    project = Project.objects.get(identifier=project_id)
+    first_node = Node.objects.filter(project=project, preview=None).first()
+    tree = node_search(first_node)
+    return tree
+
+
+def get_project_tree(project, user=None):
+    from api.models import Node
+    first_node = Node.objects.filter(project=project, preview=None).first()
+    if first_node is None:
+        return {'project': project.serialize(), 'tree': {}}
+    tree = node_search(first_node, user, True)
+    return {'project': project.serialize(), 'tree': tree}
+
+
+def the_matrix(user=None):
+    from api.models import Project
+    from api.models import Product
+    from api.models import ProductStep
+    from api.models import Node
+    return_projects_format = []
+    projects = Project.objects.all()
+    for project in projects:
+        first_node = Node.objects.filter(project=project, preview=None).first()
+        if first_node is None:
+            return_projects_format.append(
+                {'project': project.serialize(), 'tree': {}})
+            continue
+        tree = node_search(first_node, user, True)
+        return_projects_format.append(
+            {'project': project.serialize(), 'tree': tree})
+    return return_projects_format
