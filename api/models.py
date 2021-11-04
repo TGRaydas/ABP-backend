@@ -72,6 +72,8 @@ class Session(models.Model):
 
     def get_user(self, token):
         user = Session.objects.filter(token=token).first()
+        if user is None:
+            return None
         return user.user
 
 

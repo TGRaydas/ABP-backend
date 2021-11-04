@@ -5,6 +5,7 @@ from rest_framework.response import Response
 
 
 from django.http import FileResponse
+from django.http import HttpResponse
 from django.http import QueryDict
 from django.views import View
 from django.http import JsonResponse
@@ -346,6 +347,8 @@ def AssignmentDeliveryView(request):
             identifier = request.GET.get('identifier')
             user = Session().get_user(
                 request.headers['Authorization'].split(' ')[1])
+            if user is None:
+                return HttpResponse('Unauthorized', status=401)
             delivery = None
             feedback = None
             if type_ == 'step':

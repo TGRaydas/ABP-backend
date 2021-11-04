@@ -148,26 +148,35 @@ def get_groups_delivery_assigment(project, context, context_type):
     from api.models import AssignmentDelivery
     from api.models import ProductStep
     from api.models import Product
+    from api.models import Feedback
     groups = Group.objects.filter(project=project)
     return_groups = []
     for group in groups:
         user_groups = UserGroup.objects.filter(group=group)
         delivery = None
+        feedback = None
         for user_group in user_groups:
             if context_type == "product":
                 delivery = AssignmentDelivery.objects.filter(
                     product=context, user=user_group.user).first()
+                feedback = Feedback.objects.filter(
+                    product=context, group=group).first()
                 if delivery is not None:
                     break
             elif context_type == "step":
                 delivery = AssignmentDelivery.objects.filter(
                     product_step=context, user=user_group.user).first()
+                feedback = Feedback.objects.filter(
+                    product_step=context, group=group).first()
                 if delivery is not None:
                     break
         group_data = get_group_users(group)
         group_data['delivery'] = delivery
+        group_data['feedback'] = feedback
         if delivery is not None:
             group_data['delivery'] = delivery.assigment_data()
+        if feedback is not None:
+            group_data['feedback'] = feedback.feedback
         return_groups.append(group_data)
     return return_groups
 
