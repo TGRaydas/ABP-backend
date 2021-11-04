@@ -16,4 +16,5 @@ urlpatterns = [
     path('files/', FilesView, name='files'),
     path('assigment-delivery/', AssignmentDeliveryView, name='files'),
     path('resume/', Resume.as_view(), name='resume'),
+    path('feedback/', FeedbackView.as_view(), name='resume'),
 ]
