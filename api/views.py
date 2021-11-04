@@ -57,7 +57,7 @@ class GroupView(View):
         project = Project.objects.get(identifier=request.GET.get('identifier'))
         return_groups = utils.get_groups_by_project(project)
         content = {'message': 'user created',
-                   'data': return_groups, 'error': False}
+                   'data': list(reversed(return_groups)), 'error': False}
         return JsonResponse(content)
 
     def post(self, request):
