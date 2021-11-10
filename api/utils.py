@@ -206,6 +206,8 @@ def get_groups_delivery_assigment_fast(project, context, context_type, last_node
         group_data['last_delivery'] = None
         if last_node_data != []:
             group_data['last_delivery'] = last_data[0]['delivery'] != None
+        elif last_node_data == [] and delivery is None:
+            group_data['last_delivery'] = False
         if delivery is not None:
             group_data['delivery'] = delivery.assigment_data()
         if feedback is not None:
