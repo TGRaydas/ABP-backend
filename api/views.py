@@ -464,21 +464,8 @@ class FeedbackView(View):
             feedback = Feedback(group=Group.objects.get(
                 identifier=body['group_id']), feedback=body['text'], product=product)
             feedback.save()
-        content = {'message': 'Feedback creado',
+        content = {'message': 'Feedback creado at' + datetime.datetime.now().strftime(
+            '%Y-%m-%d %H:%M:%S'),
                    'error': False}
         return JsonResponse(content)
-        return
-        if 'referenceType' not in body:
-            pass
-        elif body['referenceType'] == "step":
-            step = ProductStep.objects.get(identifier=body['reference_id'])
-            node = Node.objects.get(product_step=step)
-        elif body['referenceType'] == "product":
-            product_preview = Product.objects.get(
-                identifier=body['reference_id'])
-            node = Node.objects.get(product=product_preview)
-        product = Node()
-        product = product.create(body, "product", node)
-        content = {'message': 'Producto creado',
-                   'error': False, 'node': product.identifier}
-        return JsonResponse(content)
+

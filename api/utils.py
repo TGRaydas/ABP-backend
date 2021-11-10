@@ -178,7 +178,7 @@ def get_groups_delivery_assigment(project, context, context_type):
     return return_groups
 
 
-def get_groups_delivery_assigment_fast(project, context, context_type):
+def get_groups_delivery_assigment_fast(project, context, context_type, last_node_data):
     from api.models import Group
     from api.models import AssignmentDelivery
     from api.models import Feedback
@@ -187,6 +187,9 @@ def get_groups_delivery_assigment_fast(project, context, context_type):
     for group in reversed(groups):
         delivery = None
         feedback = None
+        last_data = []
+        if last_node_data != []:
+            last_data = list(filter(lambda d: d['identifier'] == group.identifier, last_node_data))
         if context_type == "product":
             delivery = AssignmentDelivery.objects.filter(
                 product=context, group=group).first()
@@ -200,6 +203,9 @@ def get_groups_delivery_assigment_fast(project, context, context_type):
         group_data = {'name': group.name,
                       'identifier': group.identifier, 'delivery': delivery}
         group_data['feedback'] = feedback
+        group_data['last_delivery'] = None
+        if last_node_data != []:
+            group_data['last_delivery'] = last_data[0]['delivery'] != None
         if delivery is not None:
             group_data['delivery'] = delivery.assigment_data()
         if feedback is not None:
@@ -208,21 +214,22 @@ def get_groups_delivery_assigment_fast(project, context, context_type):
     return return_groups
 
 
-def resume_node_search(node, data, project):
+def resume_node_search(node, data, project, last_node_data=[]):
     from api.models import ProductStep
     from api.models import Product
     from api.models import Node
+    d = {}
     if node.product_step is not None:
         d = {'name': node.product_step.name, 'type': 'step', 'data': get_groups_delivery_assigment_fast(
-            project, node.product_step, 'step'), 'id': node.identifier}
+            project, node.product_step, 'step', last_node_data), 'id': node.identifier, 'project_id': project.identifier, 'context_id': node.product_step.identifier}
         data.append(d)
     elif node.product is not None:
         d = {'name': node.product.name, 'type': 'product', 'data': get_groups_delivery_assigment_fast(
-            project, node.product, 'product'), 'id': node.identifier}
+            project, node.product, 'product', last_node_data), 'id': node.identifier, 'project_id': project.identifier, 'context_id': node.product.identifier}
         data.append(d)
     next_nodes = Node.objects.filter(project=project, preview=node)
     for next_node in next_nodes:
-        resume_node_search(next_node, data, project)
+        resume_node_search(next_node, data, project, d['data'])
 
 
 def resume_groups_project(identifier):
@@ -251,6 +258,7 @@ def get_node_dict(node, user=None):
     from api.models import Project
     from api.models import Product
     from api.models import ProductStep
+    from api.models import Feedback
     if node.product is not None:
         product = node.product
         d = {'project_id': product.project.identifier, 'node_id': node.identifier, 'id': product.identifier, 'name': product.name,
@@ -259,6 +267,9 @@ def get_node_dict(node, user=None):
             delivery = get_assigment_delivery_by_project_group(
                 product, user, 'product', product.project.identifier)
             d['delivery'] = delivery != None
+            feedback = Feedback.objects.filter(
+                group=get_group_by_user_project(product.project, user), product=product).first()
+            d['feedback'] = feedback != None
         return d
     elif node.product_step is not None:
         product = node.product_step
@@ -268,6 +279,9 @@ def get_node_dict(node, user=None):
             delivery = get_assigment_delivery_by_project_group(
                 product, user, 'step', product.project.identifier)
             d['delivery'] = delivery != None
+            feedback = Feedback.objects.filter(
+                group=get_group_by_user_project(product.project, user), product_step=product).first()
+            d['feedback'] = feedback != None
         return d
     else:
         return {'node_id': node.identifier, 'name': 'inicio'}
@@ -292,6 +306,7 @@ def node_search(first, user=None, prev_complish=False):
     return tree
 
 
+"""
 def get_project_tree(project_id):
     from api.models import Project
     from api.models import Node
@@ -299,6 +314,7 @@ def get_project_tree(project_id):
     first_node = Node.objects.filter(project=project, preview=None).first()
     tree = node_search(first_node)
     return tree
+"""
 
 
 def get_project_tree(project, user=None):
@@ -318,7 +334,8 @@ def the_matrix(user=None):
     return_projects_format = []
     projects = Project.objects.all()
     for project in projects:
-        first_node = Node.objects.filter(project=project, preview=None).first()
+        first_node = Node.objects.filter(
+            project=project, preview=None).first()
         if first_node is None:
             return_projects_format.append(
                 {'project': project.serialize(), 'tree': {}})
